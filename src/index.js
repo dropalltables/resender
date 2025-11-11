@@ -73,6 +73,26 @@ async function handleSubscribe(request, env) {
       return new Response('Email is required', { status: 400 });
     }
 
+    // Check if this email already has a pending confirmation
+    const emailKey = `pending_email:${email}`;
+    const existingPending = await env.PENDING_SUBSCRIPTIONS.get(emailKey);
+    
+    if (existingPending) {
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Confirmation email already sent. Please check your inbox.' 
+        }), 
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        }
+      );
+    }
+
     // Generate confirmation code
     const confirmationCode = generateConfirmationCode();
 
@@ -84,9 +104,17 @@ async function handleSubscribe(request, env) {
       timestamp: Date.now(),
     };
 
+    // Store both the confirmation code and email tracking key
     await env.PENDING_SUBSCRIPTIONS.put(
       confirmationCode,
       JSON.stringify(pendingData),
+      { expirationTtl: 86400 } // 24 hours
+    );
+    
+    // Store email tracking key to prevent duplicates
+    await env.PENDING_SUBSCRIPTIONS.put(
+      emailKey,
+      confirmationCode,
       { expirationTtl: 86400 } // 24 hours
     );
 
@@ -189,8 +217,9 @@ async function handleConfirmation(request, env, url) {
 
     const resendData = await resendResponse.json();
 
-    // Delete the confirmation code from KV
+    // Delete both the confirmation code and email tracking key from KV
     await env.PENDING_SUBSCRIPTIONS.delete(confirmationCode);
+    await env.PENDING_SUBSCRIPTIONS.delete(`pending_email:${pendingData.email}`);
 
     // Return response
     if (resendResponse.ok) {
@@ -203,19 +232,20 @@ async function handleConfirmation(request, env, url) {
   <title>Subscription Confirmed</title>
   <style>
     body {
-      font-family: Helvetica, Arial, sans-serif;
+      font-family: sans-serif;
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
       margin: 0;
-      background: white;
-      color: black;
     }
   </style>
 </head>
 <body>
-  <p>Your subscription has been confirmed.</p>
+  <div>
+    <p>Your subscription has been confirmed.</p>
+    <p>You may now close this tab.</p>
+  </div>
 </body>
 </html>`,
         {
@@ -235,14 +265,12 @@ async function handleConfirmation(request, env, url) {
   <title>Subscription Error</title>
   <style>
     body {
-      font-family: Helvetica, Arial, sans-serif;
+      font-family: sans-serif;
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
       margin: 0;
-      background: white;
-      color: black;
     }
   </style>
 </head>
@@ -268,14 +296,12 @@ async function handleConfirmation(request, env, url) {
   <title>Error</title>
   <style>
     body {
-      font-family: Helvetica, Arial, sans-serif;
+      font-family: sans-serif;
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
       margin: 0;
-      background: white;
-      color: black;
     }
   </style>
 </head>
