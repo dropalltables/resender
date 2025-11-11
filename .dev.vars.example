@@ -1,4 +1,0 @@
-# Copy this file to .dev.vars and add your actual API key
-# .dev.vars is gitignored and used for local development
-
-RESEND_API_KEY=re_your_api_key_here

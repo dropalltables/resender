@@ -2,11 +2,16 @@ name = "resender"
 main = "src/index.js"
 compatibility_date = "2024-11-11"
 
-# Uncomment and configure if you need KV, D1, R2, etc.
-# [[kv_namespaces]]
-# binding = "MY_KV"
-# id = "your-kv-namespace-id"
+# KV namespace for storing pending opt-in confirmations
+[[kv_namespaces]]
+binding = "PENDING_SUBSCRIPTIONS"
+id = "72d0a007db1c40a69f0f994966d2524f"
+preview_id = "6aa1b40ebf814975b1ebca034e9b7532"
 
 # Environment variables (secrets should be set via wrangler secret put)
-# [vars]
-# ENVIRONMENT = "production"
+[vars]
+# Double opt-in email configuration
+FROM_EMAIL = "signups@system.viruus.zip"
+FROM_NAME = "Signups"
+CONFIRMATION_BASE_URL = "https://resender.viruus.workers.dev"
+# Set RESEND_API_KEY via: wrangler secret put RESEND_API_KEY
