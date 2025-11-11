@@ -1,0 +1,12 @@
+name = "resender"
+main = "src/index.js"
+compatibility_date = "2024-11-11"
+
+# Uncomment and configure if you need KV, D1, R2, etc.
+# [[kv_namespaces]]
+# binding = "MY_KV"
+# id = "your-kv-namespace-id"
+
+# Environment variables (secrets should be set via wrangler secret put)
+# [vars]
+# ENVIRONMENT = "production"
