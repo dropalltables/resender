@@ -14,4 +14,8 @@ preview_id = "6aa1b40ebf814975b1ebca034e9b7532"
 FROM_EMAIL = "signups@system.viruus.zip"
 FROM_NAME = "Signups"
 CONFIRMATION_BASE_URL = "https://resender.viruus.workers.dev"
+
+# Audience ID mappings (optional)
+AUDIENCE_BLOG = "13f5f3ff-eaa5-4020-9470-48114a8bb150"
+
 # Set RESEND_API_KEY via: wrangler secret put RESEND_API_KEY

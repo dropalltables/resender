@@ -101,6 +101,7 @@ async function handleSubscribe(request, env) {
       email: email,
       firstName: formData.get('first_name') || null,
       lastName: formData.get('last_name') || null,
+      audience: formData.get('audience') || null,
       timestamp: Date.now(),
     };
 
@@ -202,9 +203,21 @@ async function handleConfirmation(request, env, url) {
       resendPayload.lastName = pendingData.lastName;
     }
 
+    // Determine API endpoint based on whether audience is provided
+    let apiEndpoint = 'https://api.resend.com/contacts';
+    if (pendingData.audience) {
+      // Look up audience ID from environment variable (e.g., AUDIENCE_BLOG)
+      const audienceKey = `AUDIENCE_${pendingData.audience.toUpperCase()}`;
+      const audienceId = env[audienceKey];
+      
+      if (audienceId) {
+        apiEndpoint = `https://api.resend.com/audiences/${audienceId}/contacts`;
+      }
+    }
+
     // Call Resend API to add contact to audience
     const resendResponse = await fetch(
-      'https://api.resend.com/contacts',
+      apiEndpoint,
       {
         method: 'POST',
         headers: {
