@@ -43,4 +43,4 @@ Edit `wrangler.toml` to configure:
 
 ## License
 
-MIT
+AGPL-3.0
