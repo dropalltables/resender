@@ -23,6 +23,26 @@ export default {
       return handleSubscribe(request, env);
     }
 
+    // Route: Root path - show ASCII art
+    if (url.pathname === '/' && request.method === 'GET') {
+      return new Response(
+        `                                  __
+   ________  ________  ____  ____/ /__  _____
+  / ___/ _ \\/ ___/ _ \\/ __ \\/ __  / _ \\/ ___/
+ / /  /  __(__  )  __/ / / / /_/ /  __/ /
+/_/   \\___/____/\\___/_/ /_/\\__,_/\\___/_/
+
+https://github.com/dropalltables/resender
+`,
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/plain; charset=utf-8',
+          },
+        }
+      );
+    }
+
     return new Response('Method not allowed', { status: 405 });
   },
 };
