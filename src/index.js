@@ -13,14 +13,19 @@ export default {
       });
     }
 
-    // Route: Confirm subscription
-    if (url.pathname === '/confirm' && request.method === 'GET') {
-      return handleConfirmation(request, env, url);
+    // Route: Contact form
+    if (url.pathname === '/contact' && request.method === 'POST') {
+      return handleContact(request, env);
     }
 
     // Route: Subscribe (initial submission)
-    if (request.method === 'POST') {
+    if (url.pathname === '/subscribe' && request.method === 'POST') {
       return handleSubscribe(request, env);
+    }
+
+    // Route: Confirm subscription
+    if (url.pathname === '/confirm' && request.method === 'GET') {
+      return handleConfirmation(request, env, url);
     }
 
     // Route: Root path - show ASCII art
@@ -79,6 +84,84 @@ If you didn't request this subscription, you can safely ignore this email.`;
   });
 
   return response;
+}
+
+// Handle contact form submission
+async function handleContact(request, env) {
+  try {
+    // Parse form data
+    const formData = await request.formData();
+    const name = formData.get('name');
+    const email = formData.get('email');
+    const message = formData.get('message');
+    const website = formData.get('website'); // honeypot field
+
+    // Honeypot check - if the website field is filled, it's likely a bot
+    if (website) {
+      // Return success to the bot but don't actually send email
+      return new Response('', {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+        }
+      });
+    }
+
+    // Validate required fields
+    if (!name || !email || !message) {
+      return new Response('Name, email, and message are required', {
+        status: 400,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+        }
+      });
+    }
+
+    // Send email via Resend
+    const emailPayload = {
+      from: `${env.CONTACT_FROM_NAME} <${env.CONTACT_FROM_EMAIL}>`,
+      to: [env.CONTACT_TO_EMAIL],
+      reply_to: email,
+      subject: `Contact Form: ${name}`,
+      text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
+    };
+
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(emailPayload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Failed to send contact email:', errorData);
+      return new Response('Failed to send message', {
+        status: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+
+    // Return 204 No Content for successful submission
+    return new Response('', {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      }
+    });
+  } catch (error) {
+    console.error('Contact form error:', error);
+    return new Response('An error occurred', {
+      status: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  }
 }
 
 // Handle initial subscription request
