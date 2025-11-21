@@ -95,6 +95,41 @@ async function handleContact(request, env) {
     const email = formData.get('email');
     const message = formData.get('message');
     const website = formData.get('website'); // honeypot field
+    const turnstileToken = formData.get('cf-turnstile-response');
+
+    // Verify Turnstile token
+    if (!turnstileToken) {
+      return new Response('Captcha verification required', {
+        status: 400,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+        }
+      });
+    }
+
+    // Verify token with Cloudflare
+    const turnstileResponse = await fetch(
+      'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          secret: env.TURNSTILE_SECRET_KEY,
+          response: turnstileToken,
+        }),
+      }
+    );
+
+    const turnstileResult = await turnstileResponse.json();
+
+    if (!turnstileResult.success) {
+      return new Response('Captcha verification failed', {
+        status: 403,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+        }
+      });
+    }
 
     // Honeypot check - if the website field is filled, it's likely a bot
     if (website) {
