@@ -97,6 +97,21 @@ async function handleContact(request, env) {
     const website = formData.get('website'); // honeypot field
     const turnstileToken = formData.get('cf-turnstile-response');
 
+    // Collect request metadata for spam prevention
+    const clientIP = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'Unknown';
+    const userAgent = request.headers.get('User-Agent') || 'Unknown';
+    const referer = request.headers.get('Referer') || 'None';
+    
+    // Extract Cloudflare-specific metadata
+    const cf = request.cf || {};
+    const country = cf.country || 'Unknown';
+    const city = cf.city || 'Unknown';
+    const region = cf.region || 'Unknown';
+    const timezone = cf.timezone || 'Unknown';
+    const asn = cf.asn || 'Unknown';
+    const asOrganization = cf.asOrganization || 'Unknown';
+    const colo = cf.colo || 'Unknown';
+
     // Verify Turnstile token
     if (!turnstileToken) {
       return new Response('Captcha verification required', {
@@ -152,13 +167,39 @@ async function handleContact(request, env) {
       });
     }
 
+    // Build detailed email with request metadata
+    const emailText = `Name: ${name}
+Email: ${email}
+
+Message:
+${message}
+
+--- Request Information ---
+IP Address: ${clientIP}
+User Agent: ${userAgent}
+Referer: ${referer}
+
+--- Location Information ---
+Country: ${country}
+Region: ${region}
+City: ${city}
+Timezone: ${timezone}
+
+--- Network Information ---
+ASN: ${asn}
+AS Organization: ${asOrganization}
+Cloudflare Colo: ${colo}
+
+--- Timestamp ---
+${new Date().toISOString()}`;
+
     // Send email via Resend
     const emailPayload = {
       from: `${env.CONTACT_FROM_NAME} <${env.CONTACT_FROM_EMAIL}>`,
       to: [env.CONTACT_TO_EMAIL],
       reply_to: email,
       subject: `Contact Form: ${name}`,
-      text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
+      text: emailText,
     };
 
     const response = await fetch('https://api.resend.com/emails', {
