@@ -57,6 +57,13 @@ function generateConfirmationCode() {
   return crypto.randomUUID();
 }
 
+// Sanitize text to prevent injection attacks
+function sanitizeText(text) {
+  if (!text) return '';
+  // Remove null bytes and limit newlines to prevent injection
+  return String(text).replace(/\0/g, '').trim();
+}
+
 // Send confirmation email via Resend
 async function sendConfirmationEmail(email, confirmationCode, env) {
   const confirmationUrl = `${env.CONFIRMATION_BASE_URL}/confirm?code=${confirmationCode}`;
@@ -98,7 +105,8 @@ async function handleContact(request, env) {
     const turnstileToken = formData.get('cf-turnstile-response');
 
     // Collect request metadata for spam prevention
-    const clientIP = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'Unknown';
+    // CF-Connecting-IP is always available in Cloudflare Workers
+    const clientIP = request.headers.get('CF-Connecting-IP') || 'Unknown';
     const userAgent = request.headers.get('User-Agent') || 'Unknown';
     const referer = request.headers.get('Referer') || 'None';
     
@@ -168,16 +176,16 @@ async function handleContact(request, env) {
     }
 
     // Build detailed email with request metadata
-    const emailText = `Name: ${name}
-Email: ${email}
+    const emailText = `Name: ${sanitizeText(name)}
+Email: ${sanitizeText(email)}
 
 Message:
-${message}
+${sanitizeText(message)}
 
 --- Request Information ---
 IP Address: ${clientIP}
-User Agent: ${userAgent}
-Referer: ${referer}
+User Agent: ${sanitizeText(userAgent)}
+Referer: ${sanitizeText(referer)}
 
 --- Location Information ---
 Country: ${country}
