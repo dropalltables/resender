@@ -60,8 +60,8 @@ function generateConfirmationCode() {
 // Sanitize text to prevent injection attacks
 function sanitizeText(text) {
   if (!text) return '';
-  // Remove null bytes and limit newlines to prevent injection
-  return String(text).replace(/\0/g, '').trim();
+  // Remove null bytes and newlines to prevent injection
+  return String(text).replace(/\0/g, '').replace(/[\r\n]/g, ' ').trim();
 }
 
 // Send confirmation email via Resend
@@ -205,8 +205,8 @@ ${new Date().toISOString()}`;
     const emailPayload = {
       from: `${env.CONTACT_FROM_NAME} <${env.CONTACT_FROM_EMAIL}>`,
       to: [env.CONTACT_TO_EMAIL],
-      reply_to: email,
-      subject: `Contact Form: ${name}`,
+      reply_to: sanitizeText(email),
+      subject: `Contact Form: ${sanitizeText(name)}`,
       text: emailText,
     };
 
