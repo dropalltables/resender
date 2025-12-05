@@ -2,6 +2,21 @@
 
 Cloudflare Worker for managing Resend API contacts with double opt-in functionality.
 
+## Features
+
+- **Contact Form**: Handles form submissions with spam protection
+  - Cloudflare Turnstile captcha verification
+  - Honeypot field detection
+  - Comprehensive request metadata collection for spam identification:
+    - IP address (via CF-Connecting-IP)
+    - User agent
+    - Referer
+    - Geographic location (country, region, city, timezone)
+    - Network information (ASN, AS Organization, Cloudflare Colo)
+    - Timestamp
+- **Double Opt-in Subscription**: Email confirmation workflow with KV storage
+- **Audience Management**: Support for multiple Resend audiences
+
 ## Setup
 
 1. Install dependencies:

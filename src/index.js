@@ -57,6 +57,13 @@ function generateConfirmationCode() {
   return crypto.randomUUID();
 }
 
+// Sanitize text to prevent injection attacks
+function sanitizeText(text) {
+  if (!text) return '';
+  // Remove null bytes and limit newlines to prevent injection
+  return String(text).replace(/\0/g, '').trim();
+}
+
 // Send confirmation email via Resend
 async function sendConfirmationEmail(email, confirmationCode, env) {
   const confirmationUrl = `${env.CONFIRMATION_BASE_URL}/confirm?code=${confirmationCode}`;
@@ -96,6 +103,22 @@ async function handleContact(request, env) {
     const message = formData.get('message');
     const website = formData.get('website'); // honeypot field
     const turnstileToken = formData.get('cf-turnstile-response');
+
+    // Collect request metadata for spam prevention
+    // CF-Connecting-IP is always available in Cloudflare Workers
+    const clientIP = request.headers.get('CF-Connecting-IP') || 'Unknown';
+    const userAgent = request.headers.get('User-Agent') || 'Unknown';
+    const referer = request.headers.get('Referer') || 'None';
+    
+    // Extract Cloudflare-specific metadata
+    const cf = request.cf || {};
+    const country = cf.country || 'Unknown';
+    const city = cf.city || 'Unknown';
+    const region = cf.region || 'Unknown';
+    const timezone = cf.timezone || 'Unknown';
+    const asn = cf.asn || 'Unknown';
+    const asOrganization = cf.asOrganization || 'Unknown';
+    const colo = cf.colo || 'Unknown';
 
     // Verify Turnstile token
     if (!turnstileToken) {
@@ -152,13 +175,39 @@ async function handleContact(request, env) {
       });
     }
 
+    // Build detailed email with request metadata
+    const emailText = `Name: ${sanitizeText(name)}
+Email: ${sanitizeText(email)}
+
+Message:
+${sanitizeText(message)}
+
+--- Request Information ---
+IP Address: ${clientIP}
+User Agent: ${sanitizeText(userAgent)}
+Referer: ${sanitizeText(referer)}
+
+--- Location Information ---
+Country: ${country}
+Region: ${region}
+City: ${city}
+Timezone: ${timezone}
+
+--- Network Information ---
+ASN: ${asn}
+AS Organization: ${asOrganization}
+Cloudflare Colo: ${colo}
+
+--- Timestamp ---
+${new Date().toISOString()}`;
+
     // Send email via Resend
     const emailPayload = {
       from: `${env.CONTACT_FROM_NAME} <${env.CONTACT_FROM_EMAIL}>`,
       to: [env.CONTACT_TO_EMAIL],
       reply_to: email,
       subject: `Contact Form: ${name}`,
-      text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
+      text: emailText,
     };
 
     const response = await fetch('https://api.resend.com/emails', {
