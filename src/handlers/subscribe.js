@@ -7,6 +7,60 @@ export async function handleSubscribe(request, env) {
   try {
     const formData = await request.formData();
     const email = formData.get('email');
+    const turnstileToken = formData.get('cf-turnstile-response');
+
+    if (!turnstileToken) {
+      console.log(JSON.stringify({
+        event: 'subscribe_error',
+        reason: 'missing_turnstile',
+        ...meta,
+        ts: new Date().toISOString(),
+      }));
+      return new Response(
+        JSON.stringify({ success: false, error: 'Captcha verification required' }),
+        {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        }
+      );
+    }
+
+    const turnstileResponse = await fetch(
+      'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          secret: env.TURNSTILE_SECRET_KEY,
+          response: turnstileToken,
+        }),
+      }
+    );
+
+    const turnstileResult = await turnstileResponse.json();
+
+    if (!turnstileResult.success) {
+      console.log(JSON.stringify({
+        event: 'subscribe_error',
+        reason: 'turnstile_failed',
+        turnstileErrors: turnstileResult['error-codes'],
+        ...meta,
+        ts: new Date().toISOString(),
+      }));
+      return new Response(
+        JSON.stringify({ success: false, error: 'Captcha verification failed' }),
+        {
+          status: 403,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        }
+      );
+    }
 
     if (!email) {
       console.log(JSON.stringify({
