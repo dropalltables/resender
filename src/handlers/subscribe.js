@@ -1,5 +1,6 @@
 import { getRequestMeta, analyzeEmail } from '../observability.js';
 import { generateConfirmationCode, sendConfirmationEmail } from '../utils.js';
+import { captureEvent, captureException } from '../posthog.js';
 
 export async function handleSubscribe(request, env) {
   const meta = getRequestMeta(request);
@@ -50,6 +51,12 @@ export async function handleSubscribe(request, env) {
         ...meta,
         ts: new Date().toISOString(),
       }));
+      await captureEvent(env, meta.ip, 'subscription captcha failed', {
+        reason: 'turnstile_failed',
+        turnstile_errors: turnstileResult['error-codes'],
+        country: meta.country,
+        referer_domain: meta.refererDomain,
+      });
       return new Response(
         JSON.stringify({ success: false, error: 'Captcha verification failed' }),
         {
@@ -91,6 +98,12 @@ export async function handleSubscribe(request, env) {
         ...meta,
         ts: new Date().toISOString(),
       }));
+      await captureEvent(env, email, 'subscription duplicate', {
+        is_multi_email: isMultiEmail,
+        email_count_from_ip: emailCountFromIP,
+        country: meta.country,
+        referer_domain: meta.refererDomain,
+      });
       return new Response(
         JSON.stringify({ 
           success: true, 
@@ -147,6 +160,11 @@ export async function handleSubscribe(request, env) {
         ...meta,
         ts: new Date().toISOString(),
       }));
+      await captureEvent(env, email, 'subscription email failed', {
+        audience: formData.get('audience') || null,
+        country: meta.country,
+        referer_domain: meta.refererDomain,
+      });
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -196,6 +214,33 @@ export async function handleSubscribe(request, env) {
       console.log(JSON.stringify(logData));
     }
 
+    await captureEvent(env, email, 'subscription initiated', {
+      audience: pendingData.audience,
+      email_domain: emailAnalysis.domain,
+      is_disposable: emailAnalysis.isDisposable,
+      is_personal: emailAnalysis.isPersonal,
+      suspicion_score: suspicionFactors.length,
+      suspicion_factors: suspicionFactors,
+      is_multi_email: isMultiEmail,
+      email_count_from_ip: emailCountFromIP,
+      country: meta.country,
+      referer_domain: meta.refererDomain,
+      is_likely_vpn: meta.isLikelyVPN,
+      is_tor: meta.isTor,
+      browser: meta.browser,
+      os: meta.os,
+      is_mobile: meta.isMobile,
+      $set: {
+        email,
+        ...(pendingData.firstName ? { first_name: pendingData.firstName } : {}),
+        ...(pendingData.lastName ? { last_name: pendingData.lastName } : {}),
+      },
+      $set_once: {
+        initial_referer_domain: meta.refererDomain,
+        initial_country: meta.country,
+      },
+    });
+
     return new Response(
       JSON.stringify({ 
         success: true, 
@@ -216,6 +261,7 @@ export async function handleSubscribe(request, env) {
       ...meta,
       ts: new Date().toISOString(),
     }));
+    await captureException(env, error, meta.ip);
     return new Response(
       JSON.stringify({ success: false, error: error.message }), 
       {

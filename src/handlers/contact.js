@@ -1,4 +1,5 @@
 import { sanitizeText } from '../utils.js';
+import { captureEvent, captureException } from '../posthog.js';
 
 export async function handleContact(request, env) {
   try {
@@ -46,6 +47,10 @@ export async function handleContact(request, env) {
     const turnstileResult = await turnstileResponse.json();
 
     if (!turnstileResult.success) {
+      await captureEvent(env, clientIP, 'contact captcha failed', {
+        turnstile_errors: turnstileResult['error-codes'],
+        country,
+      });
       return new Response('Captcha verification failed', {
         status: 403,
         headers: {
@@ -117,6 +122,9 @@ ${new Date().toISOString()}`;
     if (!response.ok) {
       const errorData = await response.json();
       console.error('Failed to send contact email:', errorData);
+      await captureEvent(env, sanitizeText(email) || clientIP, 'contact email failed', {
+        country,
+      });
       return new Response('Failed to send message', {
         status: 500,
         headers: {
@@ -124,6 +132,12 @@ ${new Date().toISOString()}`;
         },
       });
     }
+
+    await captureEvent(env, sanitizeText(email), 'contact submitted', {
+      country,
+      referer: sanitizeText(referer),
+      $set: { email: sanitizeText(email) },
+    });
 
     return new Response('', {
       status: 204,
@@ -133,6 +147,7 @@ ${new Date().toISOString()}`;
     });
   } catch (error) {
     console.error('Contact form error:', error);
+    await captureException(env, error, request.headers.get('CF-Connecting-IP') || 'Unknown');
     return new Response('An error occurred', {
       status: 500,
       headers: {

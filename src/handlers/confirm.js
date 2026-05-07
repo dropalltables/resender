@@ -1,4 +1,5 @@
 import { getRequestMeta } from '../observability.js';
+import { captureEvent, captureException } from '../posthog.js';
 
 export async function handleConfirmation(request, env, url) {
   const meta = getRequestMeta(request);
@@ -25,6 +26,10 @@ export async function handleConfirmation(request, env, url) {
         ...meta,
         ts: new Date().toISOString(),
       }));
+      await captureEvent(env, meta.ip, 'subscription confirmation expired', {
+        country: meta.country,
+        referer_domain: meta.refererDomain,
+      });
       return new Response(
         'Confirmation link expired or invalid. Please try subscribing again.',
         { status: 404 }
@@ -94,6 +99,13 @@ export async function handleConfirmation(request, env, url) {
     if (!resendResponse.ok) {
       confirmLogData.apiError = resendData;
       console.error(JSON.stringify(confirmLogData));
+      await captureEvent(env, pendingData.email, 'subscription confirmation failed', {
+        audience: pendingData.audience,
+        signup_to_confirm_ms: Date.now() - pendingData.timestamp,
+        location_mismatch: locationMismatch,
+        country_mismatch: countryMismatch,
+        country: meta.country,
+      });
     } else if (locationMismatch || countryMismatch) {
       console.warn(JSON.stringify(confirmLogData));
     } else {
@@ -101,6 +113,21 @@ export async function handleConfirmation(request, env, url) {
     }
 
     if (resendResponse.ok) {
+      await captureEvent(env, pendingData.email, 'subscription confirmed', {
+        audience: pendingData.audience,
+        signup_to_confirm_ms: Date.now() - pendingData.timestamp,
+        location_mismatch: locationMismatch,
+        country_mismatch: countryMismatch,
+        signup_country: signupMeta.country,
+        confirm_country: meta.country,
+        referer_domain: signupMeta.refererDomain,
+        $set: {
+          email: pendingData.email,
+          ...(pendingData.firstName ? { first_name: pendingData.firstName } : {}),
+          ...(pendingData.lastName ? { last_name: pendingData.lastName } : {}),
+          subscription_confirmed: true,
+        },
+      });
       return new Response(
         `<!DOCTYPE html>
 <html>
@@ -171,6 +198,7 @@ export async function handleConfirmation(request, env, url) {
       ...meta,
       ts: new Date().toISOString(),
     }));
+    await captureException(env, error, meta.ip);
     return new Response(
       `<!DOCTYPE html>
 <html>
