@@ -15,7 +15,7 @@
   "author": "",
   "license": "AGPL-3.0",
   "devDependencies": {
-    "wrangler": "^4.47.0"
+    "wrangler": "^4.88.0"
   },
   "dependencies": {
     "posthog-node": "^5.33.3"
